@@ -1,0 +1,141 @@
+# Docker Management Related Containers
+# -----------------------------------------------------------------------------------------------------------------
+# -         - Watchtower                  Update containers with latest imiages
+# -         - Autoheal                    Restarts unhealthy containers
+# 9000      - Portainer                   Docker management tool
+# 9999      - Dozzle                      Container log aggregator
+# 88        - Monitorr                    Web page monitor
+# 5443      - Organizr                    Link / Page manager
+version: '2.4'
+
+# NETWORKS ####################################################################################
+networks:
+  home_vlan:
+    external: true
+  iot_vlan:
+    external: true
+  extenal_bridge:
+    external: true
+  internal_bridge:
+    external: true
+
+# SERVICES ####################################################################################
+services:
+  #
+  # Portainer - Container Managaement Made Easy
+  # https://www.portainer.io/
+  #
+  portainer:
+    image: portainer/portainer-ce
+    container_name: portainer
+    command: -H unix:///var/run/docker.sock
+    restart: always
+    ports:
+      - 9000:9000
+    networks:
+      home_vlan:
+        ipv4_address: ${PORTAINER_IP}  # Set static IP address on IOT network
+      internal_bridge:
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${SERVICES_BASE_PATH}/portainer-ce/:/data
+    env_file:
+      - ${COMPOSE_BASE_PATH}/common.env
+
+  #
+  # Watchtower - updates containers with latest images
+  # https://containrrr.dev/watchtower/
+  # - no health check available (if it fails, it just restarts by default)
+  #
+  watchtower:
+    container_name: watchtower
+    image: containrrr/watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock 
+    # Environment section needs to be in this format for the notifications to work
+    env_file:
+      - ${COMPOSE_BASE_PATH}/common.env
+    environment:
+      WATCHTOWER_SCHEDULE: 0 0 4 * * *
+      WATCHTOWER_REMOVE_VOLUMES: "true"
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_INCLUDE_STOPPED: "true"
+      WATCHTOWER_POLL_INTERVAL: $WT_INTERVAL
+      WATCHTOWER_TIMEOUT: 15
+      WATCHTOWER_NOTIFICATIONS_LEVEL: info
+      WATCHTOWER_NOTIFICATIONS: shoutrrr
+      # Using Pushbullet, telegram and pushover as examples, but just pick one
+      # WATCHTOWER_NOTIFICATION_URL: "pushover://shoutrrr:$PUSHOVER_APP_API__SECRET@$PUSHOVER_USER_API__SECRET/?devices=$PUSHOVER_DEVICE telegram://$TELEGRAM_BOT_TOKEN__SECRET@telegram?channels=$TELEGRAM_CHAT_ID__SECRET pushbullet://$PUSHBULLET_API__SECRET"
+      # WATCHTOWER_NOTIFICATION_URL: "telegram://$TELEGRAM_BOT_TOKEN__SECRET@telegram?channels=$TELEGRAM_CHAT_ID__SECRET"
+      # WATCHTOWER_NOTIFICATIONS: email
+      # WATCHTOWER_NOTIFICATION_EMAIL_FROM: $GM_USER__SECRET
+      # WATCHTOWER_NOTIFICATION_EMAIL_TO: $GM_TO__SECRET
+      # WATCHTOWER_NOTIFICATION_EMAIL_SERVER: $GM_SERVER
+      # WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PORT: $GM_PORT
+      # WATCHTOWER_NOTIFICATION_EMAIL_SERVER_USER: $GM_USER__SECRET
+      # WATCHTOWER_NOTIFICATION_EMAIL_SERVER_PASSWORD: $GM_PSW__SECRET
+  #
+  # Autoheal
+  #
+  #
+  autoheal:
+    container_name: autoheal
+    image: willfarrell/autoheal
+    restart: unless-stopped
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock'
+    env_file:
+      - ${COMPOSE_BASE_PATH}/common.env
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=all
+
+  # #
+  # # dozzle - real time docker log viewer
+  # # 
+  # #
+  # dozzle:
+  #   container_name: dozzle
+  #   image: amir20/dozzle
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #   ports:
+  #     - 9999:8080
+  #   restart: unless-stopped
+  # #
+  # # monitorr - basic web site monitor
+  # # - no health check available atm
+  # #
+  # monitorr:
+  #   container_name: monitorr
+  #   image: index.docker.io/monitorr/monitorr
+  #   ports:
+  #     - "88:80/tcp"
+  #   environment:
+  #     - PUID=$PUID
+  #     - PGID=$PGID
+  #     - TZ=$TIME_ZONE
+  #   volumes:
+  #     - $PERSIST/monitorr:/app
+  #   restart: on-failure
+  # #
+  # # organizr - link and page manager
+  # #
+  # organizr:
+  #   environment:
+  #     - HOME=/root
+  #     - TERM=xterm
+  #     - TZ=$TIME_ZONE
+  #   volumes:
+  #     - $PERSIST/organizr/config:/config:rw
+  #   container_name: organizr
+  #   ports:
+  #     - 5443:443
+  #     - 580:80
+  #   restart: 'on-failure:0'
+  #   entrypoint:
+  #     - /init
+  #   labels: 
+  #     - autoheal=$AUTOHEAL_RESTART
+  #   image: organizr/organizr
+
