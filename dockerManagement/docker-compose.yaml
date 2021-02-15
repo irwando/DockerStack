@@ -51,6 +51,9 @@ services:
     container_name: watchtower
     image: containrrr/watchtower
     restart: unless-stopped
+    networks:
+      external_bridge:
+      internal_bridge:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock 
     # Environment section needs to be in this format for the notifications to work
@@ -83,6 +86,9 @@ services:
     container_name: autoheal
     image: willfarrell/autoheal
     restart: unless-stopped
+    networks:
+      external_bridge:
+      internal_bridge:
     volumes:
       - '/var/run/docker.sock:/var/run/docker.sock'
     env_file:
